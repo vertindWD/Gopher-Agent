@@ -1,0 +1,28 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (Safe to ignore since we use go modules)
+vendor/
+
+# IDE and Editor folders
+.idea/
+.vscode/
+*.swp
+
+# Compiled main binary (假设你 build 出来的名字叫 gopher-agent)
+gopher-agent
+/bin/
+
+# 本地敏感配置文件 (非常重要！绝对不能把真实密码传上去)
+configs/config.yaml
+.env

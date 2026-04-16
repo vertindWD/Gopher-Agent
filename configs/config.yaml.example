@@ -1,0 +1,26 @@
+// 此文件仅为示例，需替换为自己对应的数据
+
+server:
+  port: ""
+kafka:
+  brokers: [""]
+  topic: ""
+llm:
+  api_key: ""
+  base_url: "https://api.deepseek.com/v1" //以deepseek为例
+  model: "deepseek-chat" //示例
+mysql:
+  host: "" 
+  port:  
+  user: ""
+  password: ""
+  dbname: ""
+  max_idle_conns: 10 // 均可替换
+  max_open_conns: 100
+  max_lifetime: 3600
+redis:
+  host: ""
+  port:   
+  password: ""
+  db: 
+  pool_size: 100

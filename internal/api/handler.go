@@ -56,7 +56,7 @@ func SubmitTask(c *gin.Context) {
 
 	// 5. 立即返回 TaskID 给前端，不让前端傻等 AI 思考
 	c.JSON(http.StatusOK, gin.H{
-		"message": "✅ 任务已成功提交至后台队列",
+		"message": "任务已成功提交至后台队列",
 		"task_id": taskID,
 	})
 }
@@ -68,7 +68,7 @@ func QueryTask(c *gin.Context) {
 	var task model.AgentTask
 	// 去数据库里找这个任务
 	if err := repository.DB.Where("task_id = ?", taskID).First(&task).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "❌ 找不到该任务"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "找不到该任务"})
 		return
 	}
 

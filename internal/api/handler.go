@@ -45,7 +45,7 @@ func SubmitTask(c *gin.Context) {
 
 	// 3. 将任务投递到 Kafka
 	if err := kafka.SendTaskMessage(context.Background(), taskID, req.Prompt); err != nil {
-		// 投递失败时的兜底逻辑（非常重要的容错处理）
+		// 投递失败时的处理
 		repository.DB.Model(&task).Update("status", model.TaskStatusFailed)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "系统繁忙，任务排队失败"})
 		return
@@ -54,7 +54,7 @@ func SubmitTask(c *gin.Context) {
 	// 4. 投递成功，更新数据库状态为 InQueue (已入队)
 	repository.DB.Model(&task).Update("status", model.TaskStatusRunning)
 
-	// 5. 立即返回 TaskID 给前端，不让前端傻等 AI 思考
+	// 5. 立即返回 TaskID 给前端，不让前端等 AI 思考
 	c.JSON(http.StatusOK, gin.H{
 		"message": "任务已成功提交至后台队列",
 		"task_id": taskID,

@@ -10,6 +10,7 @@ func SetupRouter() *gin.Engine {
 	{
 		v1.POST("/agent/task", SubmitTask)
 		v1.GET("/agent/task/:task_id", QueryTask)
+		v1.GET("/agent/task/:task_id/stream", StreamTask)
 	}
 
 	return r

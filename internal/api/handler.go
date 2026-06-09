@@ -51,14 +51,67 @@ func SubmitTask(c *gin.Context) {
 		return
 	}
 
-	// 4. 投递成功，更新数据库状态为 InQueue (已入队)
-	repository.DB.Model(&task).Update("status", model.TaskStatusRunning)
-
-	// 5. 立即返回 TaskID 给前端，不让前端等 AI 思考
+	// 4. 立即返回 TaskID 给前端，不让前端傻等 AI 思考
 	c.JSON(http.StatusOK, gin.H{
 		"message": "任务已成功提交至后台队列",
 		"task_id": taskID,
 	})
+}
+
+// StreamTask 通过 SSE 实时推送 Agent 的流式输出
+func StreamTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+
+	var task model.AgentTask
+	if err := repository.DB.Where("task_id = ?", taskID).First(&task).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "找不到该任务"})
+		return
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+
+	// 任务已完成，直接返回完整结果，无需订阅
+	if task.Status == model.TaskStatusCompleted {
+		c.SSEvent("result", task.Result)
+		c.Writer.Flush()
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// 先订阅，再 replay 缓冲，保证不丢实时消息
+	pubsub := repository.SubscribeStream(ctx, taskID)
+	defer pubsub.Close()
+
+	// 回放断线前已缓冲的 chunks
+	buffered, _ := repository.GetChunks(ctx, taskID)
+	for _, chunk := range buffered {
+		if chunk == "[DONE]" {
+			c.SSEvent("done", "")
+			c.Writer.Flush()
+			return
+		}
+		c.SSEvent("chunk", chunk)
+	}
+	c.Writer.Flush()
+
+	// 继续接收实时 chunks
+	for {
+		select {
+		case msg := <-pubsub.Channel():
+			if msg.Payload == "[DONE]" {
+				c.SSEvent("done", "")
+				c.Writer.Flush()
+				return
+			}
+			c.SSEvent("chunk", msg.Payload)
+			c.Writer.Flush()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // QueryTask 查询任务执行状态与结果

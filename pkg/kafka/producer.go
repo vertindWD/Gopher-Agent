@@ -20,7 +20,7 @@ func InitProducer() {
 		Topic:    cfg.Topic,
 		Balancer: &kafka.LeastBytes{}, // 负载均衡策略：优先发给数据量最少的分区
 	}
-	logger.Log.Info("✅ Kafka Producer 基础设施初始化完成")
+	logger.Log.Info("Kafka Producer 基础设施初始化完成")
 }
 
 // SendTaskMessage 投递任务到消息队列
@@ -39,7 +39,7 @@ func SendTaskMessage(ctx context.Context, taskID string, prompt string) error {
 	})
 
 	if err != nil {
-		logger.Log.Error("❌ 投递 Kafka 消息失败", zap.Error(err), zap.String("task_id", taskID))
+		logger.Log.Error("投递 Kafka 消息失败", zap.Error(err), zap.String("task_id", taskID))
 		return err
 	}
 	return nil

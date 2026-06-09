@@ -1,10 +1,18 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
 	"agent/internal/api"
 	"agent/internal/config"
 	"agent/internal/repository"
-	"agent/internal/worker" // 【新增】引入 worker 包
+	"agent/internal/worker"
 	"agent/pkg/kafka"
 	"agent/pkg/logger"
 
@@ -12,27 +20,48 @@ import (
 )
 
 func main() {
-	// 1. 启动日志引擎
 	logger.InitLogger()
 	defer logger.Log.Sync()
 
-	// 2. 加载配置文件
 	config.InitConfig()
 
-	// 3. 初始化基础设施
 	repository.InitDB(config.AppConfig.MySQLConfig.DSN())
 	repository.InitRedis()
 	kafka.InitProducer()
 
-	// 【新增】启动 Kafka 消费者 (必须放在 go 协程中运行)
-	go worker.StartConsumer()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// 4. 启动 HTTP API 服务
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		worker.StartConsumer(ctx)
+	}()
+
 	r := api.SetupRouter()
 	port := config.AppConfig.ServerConfig.Port
-	logger.Log.Info("🚀 Gopher-Agent API Server is running on port " + port)
-
-	if err := r.Run(port); err != nil {
-		logger.Log.Fatal("服务启动失败: ", zap.Error(err))
+	srv := &http.Server{
+		Addr:    port,
+		Handler: r,
 	}
+
+	logger.Log.Info("🚀 Gopher-Agent API Server is running on port " + port)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Log.Fatal("服务启动失败", zap.Error(err))
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Log.Info("收到退出信号，开始优雅退出...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Log.Error("HTTP Server 关闭异常", zap.Error(err))
+	}
+
+	wg.Wait()
+	logger.Log.Info("✅ 服务已安全退出")
 }

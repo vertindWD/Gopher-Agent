@@ -15,7 +15,7 @@ import (
 )
 
 // RunAgent 执行核心 AI 逻辑 (升级为 ReAct Agent)
-func RunAgent(ctx context.Context, prompt string) (string, error) {
+func RunAgent(ctx context.Context, prompt string, onChunk func(string)) (string, error) {
 	cfg := config.AppConfig.LLMConfig
 
 	// 1. 初始化大模型 (DeepSeek 完美兼容 OpenAI 接口)
@@ -50,7 +50,14 @@ func RunAgent(ctx context.Context, prompt string) (string, error) {
 	logger.Log.Info("🤖 Agent 开始思考并拆解任务...", zap.String("指令", prompt))
 
 	// 4. 运行 Agent
-	result, err := chains.Run(ctx, executor, prompt)
+	result, err := chains.Run(ctx, executor, prompt,
+		chains.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			if onChunk != nil {
+				onChunk(string(chunk))
+			}
+			return nil
+		}),
+	)
 	if err != nil {
 		logger.Log.Error("Agent 执行异常", zap.Error(err))
 		return "", err
